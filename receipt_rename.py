@@ -344,10 +344,14 @@ def process_file(file_path, args, logger, backup_dir):
                 if os.path.exists(new_path) and os.path.getsize(file_path) == os.path.getsize(new_path):
                     with open(file_path, 'rb') as f1, open(new_path, 'rb') as f2:
                         if f1.read() == f2.read():
-                            logger.warning(f"同一ファイルが既に存在します: {new_path}")
-                            return
+                            # 同一ファイルの場合は連番を付与
+                            base_no_ext = os.path.splitext(original_new_path)[0]
+                            new_path = f"{base_no_ext}_{counter}{ext}"
+                            counter += 1
+                            logger.info(f"同一ファイルを連番付きで保存します: {new_path}")
+                            break
                 
-                # 連番付きの新しいパスを生成
+                # 異なるファイルの場合は連番を付与
                 base_no_ext = os.path.splitext(original_new_path)[0]
                 new_path = f"{base_no_ext}_{counter}{ext}"
                 counter += 1
