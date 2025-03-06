@@ -433,24 +433,34 @@ def main():
             break
     
     if year_index != -1:
-        # --yearオプションが見つかった場合
         try:
+            # 引数を3つの部分に分割
+            before_year = args_list[:year_index]  # --year より前の引数
+            after_year = args_list[year_index + 1:]  # --year 以降の引数
+            
             # 年の値を収集
             year_values = []
-            i = year_index + 1
-            while i < len(args_list) and args_list[i].isdigit():
-                year_values.append(args_list[i])
-                i += 1
+            file_args = []
+            i = 0
+            while i < len(after_year):
+                if after_year[i].isdigit():
+                    year_values.append(after_year[i])
+                    i += 1
+                elif after_year[i] == '--':
+                    # -- 以降の引数は全てファイル名として扱う
+                    file_args.extend(after_year[i + 1:])
+                    break
+                else:
+                    # 数字でない引数はファイル名として扱う
+                    file_args.append(after_year[i])
+                    i += 1
             
             # 引数を再構築
-            new_args = args_list[:year_index]  # --year より前の引数
-            new_args.extend([year_option] + year_values)  # --year とその値
-            if '--' in args_list[i:]:
-                dash_index = args_list[i:].index('--') + i
-                new_args.extend(args_list[i:dash_index])  # --year の値と -- の間の引数
-                new_args.extend(args_list[dash_index:])  # -- 以降の引数
-            else:
-                new_args.extend(args_list[i:])  # 残りの引数
+            new_args = before_year
+            if year_values:
+                new_args.extend([year_option] + year_values)
+            if file_args:
+                new_args.extend(['--'] + file_args)  # -- を追加してファイル名を区切る
             
             sys.argv = [sys.argv[0]] + new_args
         except Exception as e:
