@@ -71,3 +71,5 @@ ENV/
 *.bak
 *.swp
 *~ 
+.specstory/
+.cursorindexingignore
