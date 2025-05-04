@@ -67,20 +67,27 @@ class ReceiptExtractor:
             'filename': filename
         }, reasons
 
-    def get_receipts_for_year(self, year: int) -> List[Tuple[Dict[str, str], List[str]]]:
-        """指定年のレシート情報を取得"""
+    def get_receipts(self, year: int = None, month: int = None) -> List[Tuple[Dict[str, str], List[str]]]:
+        """指定年・月のレシート情報を取得（指定がなければ全件）"""
         receipts = []
-        
         try:
-            # 入力ディレクトリ内のファイルを直接検索
             for filename in os.listdir(self.base_dir):
                 if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.pdf')):
                     info, reasons = self.extract_info(filename)
+                    # 年・月フィルタ
+                    if year or month:
+                        try:
+                            date = datetime.strptime(info['date'], '%Y-%m-%d')
+                            if year and date.year != year:
+                                continue
+                            if month and date.month != month:
+                                continue
+                        except Exception:
+                            pass
                     receipts.append((info, reasons))
         except Exception as e:
             print(f"エラー: ファイルの読み込み中にエラーが発生しました: {e}", file=sys.stderr)
             return receipts
-
         return receipts
 
     def print_csv(self, receipts: List[Tuple[Dict[str, str], List[str]]], show_unknown: bool = False):
@@ -112,24 +119,22 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='レシート情報をCSVに出力')
-    parser.add_argument('--year', type=int, required=True, help='対象年')
+    parser.add_argument('--year', type=int, help='対象年（省略時は全件）')
+    parser.add_argument('--month', type=int, help='対象月（省略時は全件）')
     parser.add_argument('--input-dir', type=str, required=True, help='レシートファイルが直接格納されているディレクトリのパス')
     parser.add_argument('--show-unknown', action='store_true', help='不明なファイル名を表示')
     args = parser.parse_args()
 
     try:
-        # 入力ディレクトリのパスを正規化
         input_dir = os.path.expanduser(args.input_dir)
         extractor = ReceiptExtractor(input_dir)
-        
-        print(f"{args.year}年のレシート情報を取得中...", file=sys.stderr)
-        receipts = extractor.get_receipts_for_year(args.year)
-        
+
+        receipts = extractor.get_receipts(year=args.year, month=args.month)
+
         if not receipts:
-            print(f"{args.year}年のレシートが見つかりませんでした。", file=sys.stderr)
+            print("レシートが見つかりませんでした。", file=sys.stderr)
             sys.exit(1)
 
-        print(f"{len(receipts)}件のレシート情報を取得しました。", file=sys.stderr)
         extractor.print_csv(receipts, args.show_unknown)
         sys.exit(0)
 
