@@ -18,22 +18,35 @@
 
 ---
 
-## インストール方法
+## セットアップと実行
 
-1. 必要なパッケージのインストール:
+1. 初回セットアップ（venv作成と依存インストール、Python 3.11使用）:
 ```bash
-pip install google-generativeai
-pip install pdf2image
-pip install pandas
+./scripts/ensure_venv.sh
 ```
 
-2. Google AI APIキーの設定:
+2. 仮想環境の有効化:
+```bash
+source .venv/bin/activate
+```
+
+3. Google AI APIキーの設定:
    - [Google AI Studio](https://makersuite.google.com/app/apikey)でAPIキーを取得
    - ホームディレクトリに`.google_AI_API`ファイルを作成
    - 以下の形式でAPIキーを記述:
      ```
      GOOGLE_API_KEY=あなたのAPIキー
      ```
+
+4. 実行方法（ラッパー経由）:
+```bash
+bin/receipt_rename <path_or_dir>
+# または
+bin/listup_receipts --input-dir <dir> [--year 2025 --month 1]
+```
+
+備考:
+- `pdf2image`の外部依存（poppler）は本仕様では扱いません。
 
 ---
 

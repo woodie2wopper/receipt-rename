@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+ 
+
 import os
 import re
 import csv
@@ -85,6 +87,16 @@ class ReceiptExtractor:
                         except Exception:
                             pass
                     receipts.append((info, reasons))
+            
+            # 日付順にソート（不明な日付は最後に表示）
+            def get_sort_key(item):
+                try:
+                    return datetime.strptime(item[0]['date'], '%Y-%m-%d')
+                except ValueError:
+                    return datetime.max
+            
+            receipts.sort(key=get_sort_key)
+            
         except Exception as e:
             print(f"エラー: ファイルの読み込み中にエラーが発生しました: {e}", file=sys.stderr)
             return receipts

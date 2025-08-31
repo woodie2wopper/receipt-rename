@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# SPEC_ID: venv-always-on (wrapper)
+# Generated on 2025-08-31
+
+set -vexu
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+VENV_DIR="$REPO_ROOT/.venv"
+
+if [ ! -d "$VENV_DIR" ]; then
+  echo "仮想環境が見つかりません: $VENV_DIR" >&2
+  echo "初回セットアップ: ./scripts/ensure_venv.sh" >&2
+  exit 1
+fi
+
+if [ "${VIRTUAL_ENV:-}" != "$VENV_DIR" ]; then
+  echo "仮想環境が有効ではありません。" >&2
+  echo "次を実行してください: source .venv/bin/activate" >&2
+  exit 1
+fi
+
+exec python "$REPO_ROOT/receipt_rename.py" "$@"
+
