@@ -18,14 +18,17 @@
 
 # ログファイル
 logs/
+log/
 *.log
 receipt_processing.log
+receipt_log.csv
 
 # バックアップディレクトリ
 backup_*/
 
 # テキストファイル（OCR結果）
 *.txt
+!requirements.txt
 
 # キャッシュディレクトリ
 .cache/
@@ -57,6 +60,7 @@ venv/
 env/
 ENV/
 .env
+.venv/
 
 # IDE関連
 .idea/
@@ -73,3 +77,4 @@ ENV/
 *~ 
 .specstory/
 .cursorindexingignore
+tmp/
