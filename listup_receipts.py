@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
- 
+# venv activation guard: suggest activation before heavy imports
+import os as _os_check
+import sys as _sys_check
+_repo_root_check = _os_check.path.dirname(_os_check.path.abspath(__file__))
+_venv_dir_check = _os_check.path.join(_repo_root_check, '.venv')
+if _os_check.path.isdir(_venv_dir_check):
+    _venv_env = _os_check.environ.get('VIRTUAL_ENV', '')
+    if _venv_env != _venv_dir_check:
+        _sys_check.stderr.write(
+            "仮想環境が有効ではありません。\n"
+            "次を実行してください: source .venv/bin/activate\n"
+            "または: bin/listup_receipts <args>\n"
+        )
+        _sys_check.exit(1)
 
 import os
 import re
