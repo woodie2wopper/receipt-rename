@@ -17,7 +17,8 @@ if ! command -v python3.11 >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -d "$VENV_DIR" ]; then
+if [ ! -x "$VENV_DIR/bin/python" ]; then
+  rm -rf "$VENV_DIR"
   python3.11 -m venv "$VENV_DIR"
 fi
 
