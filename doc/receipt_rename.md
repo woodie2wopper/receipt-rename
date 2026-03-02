@@ -192,18 +192,20 @@
    - Googleアカウントでログイン
    - 「APIキーを作成」をクリック
    - 生成されたAPIキーをコピー
-   - ホームディレクトリ（`~`）に`.google_AI_API`ファイルを作成
+   - ホームディレクトリ（`~`）に`~/.SecretVault`ディレクトリを作成
+   - `~/.SecretVault/google_AI_API.txt`ファイルを作成
    - 以下の形式でAPIキーを記述:
      ```
      GOOGLE_API_KEY=あなたのAPIキー
      ```
    - ファイルのパーミッション: `600`（所有者のみ読み書き可能）に設定することを推奨
    ```bash
-   chmod 600 ~/.google_AI_API
+   chmod 700 ~/.SecretVault
+   chmod 600 ~/.SecretVault/google_AI_API.txt
    ```
 2. APIキーのセキュリティ:
    - APIキーは絶対にGitHubなどの公開リポジトリにコミットしないでください
-   - `.google_AI_API`ファイルはバックアップ対象から除外することを推奨
+   - `~/.SecretVault/google_AI_API.txt`はバックアップ対象から除外することを推奨
    - 共有環境で使用する場合は、各ユーザーが独自のAPIキーを設定してください
    - APIキーは定期的にローテーションすることを推奨
    - 不要になったAPIキーは必ず無効化してください

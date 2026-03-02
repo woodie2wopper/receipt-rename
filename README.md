@@ -32,7 +32,8 @@ source .venv/bin/activate
 
 3. Google AI APIキーの設定:
    - [Google AI Studio](https://makersuite.google.com/app/apikey)でAPIキーを取得
-   - ホームディレクトリに`.google_AI_API`ファイルを作成
+   - ホームディレクトリに`~/.SecretVault`ディレクトリを作成
+   - `~/.SecretVault/google_AI_API.txt`ファイルを作成
    - 以下の形式でAPIキーを記述:
      ```
      GOOGLE_API_KEY=あなたのAPIキー
