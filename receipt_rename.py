@@ -79,7 +79,7 @@ def setup_logging(debug=False, verbose=False):
     return logging.getLogger(__name__)
 
 def load_api_key():
-    api_key_file = os.path.expanduser("~/.google_AI_API")
+    api_key_file = os.path.expanduser("~/.SecretVault/google_AI_API.txt")
     try:
         with open(api_key_file, 'r') as f:
             for line in f:
@@ -87,7 +87,7 @@ def load_api_key():
                     return line.split('=')[1].strip()
     except Exception as e:
         print(f"エラー: APIキーの読み込みに失敗しました: {e}")
-        print(f"~/.google_AI_APIファイルを確認してください。")
+        print(f"~/.SecretVault/google_AI_API.txtファイルを確認してください。")
         print("フォーマット: GOOGLE_API_KEY=あなたのAPIキー")
         sys.exit(1)
     return None
