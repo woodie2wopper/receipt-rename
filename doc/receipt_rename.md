@@ -51,6 +51,15 @@
 - `--verbose`, `-v`: 詳細な出力を表示（処理時間を含む）
 - `--no-text`: テキストファイルの保存を無効化（デフォルトでは保存する）
 
+#### LLM切替用の環境変数
+- `LLM_PROVIDER`: `gemini`（既定）または `openwebui`（`local-llm` 互換）
+- `LLM_BASE_URL`: Open WebUI APIのベースURL（例: `http://192.168.1.40:12000`）
+- `OPENWEBUI_TOKEN`: Open WebUI の API Key
+- `LLM_MODEL`: 使用モデルID（例: `qwen2.5:7b`）
+- `LLM_TEMPERATURE`: 既定 `0`
+- `LLM_MAX_TOKENS`: 既定 `200`
+- `LLM_TIMEOUT_SECONDS`: 既定 `60`
+
 #### 複数ファイル処理
 - 複数のファイルを直接指定可能
 - ワイルドカード（`*.jpg`など）使用可能
@@ -150,12 +159,12 @@
 
 ### エラー処理
 - ファイルが存在しない場合はエラーメッセージを表示
-- APIキーが設定されていない場合はエラーメッセージを表示
+- LLM認証情報が設定されていない場合はエラーメッセージを表示
 - PDFの変換に失敗した場合はエラーログを記録
 - 画像の処理に失敗した場合はスキップしてログを記録
 
 ### 依存パッケージ
-- google-generativeai: Gemini APIを使用したOCR処理
+- google-generativeai: `LLM_PROVIDER=gemini` 時のOCR処理
 - pdf2image: PDFから画像への変換
 - pandas: データ処理
 - base64: 画像エンコーディング
@@ -186,29 +195,38 @@
 - 並列処理時: ファイル数÷CPU数×平均処理時間
 
 ### セキュリティとプライバシーに関する注意事項
-#### APIキーの取り扱い
-1. APIキーの設定:
-   - [Google AI Studio](https://makersuite.google.com/app/apikey)にアクセス
-   - Googleアカウントでログイン
-   - 「APIキーを作成」をクリック
-   - 生成されたAPIキーをコピー
-   - ホームディレクトリ（`~`）に`~/.SecretVault`ディレクトリを作成
-   - `~/.SecretVault/google_AI_API.txt`ファイルを作成
-   - 以下の形式でAPIキーを記述:
+#### LLM認証情報の取り扱い
+1. 前提:
+   - 本リポジトリは公開リポジトリです。秘密情報（APIキー/トークン）は**絶対にコミットしない**でください。
+   - 秘密情報は `~/.SecretVault` など、リポジトリ外に保存してください。
+2. `gemini` を使う場合（既定）:
+   - [Google AI Studio](https://makersuite.google.com/app/apikey)でキーを作成
+   - `~/.SecretVault/GEMINI_API.txt` に保存
      ```
-     GOOGLE_API_KEY=あなたのAPIキー
+     GOOGLE_API_KEY=your_google_api_key
      ```
-   - ファイルのパーミッション: `600`（所有者のみ読み書き可能）に設定することを推奨
+3. `local-llm` を使う場合（Open WebUI / 環境依存の一例）:
+   - `~/.SecretVault/GX10_OLLAMA_API.txt` に保存
+     ```bash
+     export LLM_BASE_URL="http://192.168.1.40:12000"
+     export OPENWEBUI_TOKEN="your_openwebui_token"
+     export LLM_MODEL="qwen2.5:7b"
+     ```
+   - 実行前に読み込み
+     ```bash
+     source ~/.SecretVault/GX10_OLLAMA_API.txt
+     export LLM_PROVIDER=openwebui
+     ```
+4. 推奨パーミッション:
    ```bash
    chmod 700 ~/.SecretVault
-   chmod 600 ~/.SecretVault/google_AI_API.txt
+   chmod 600 ~/.SecretVault/GEMINI_API.txt
+   chmod 600 ~/.SecretVault/GX10_OLLAMA_API.txt
    ```
-2. APIキーのセキュリティ:
-   - APIキーは絶対にGitHubなどの公開リポジトリにコミットしないでください
-   - `~/.SecretVault/google_AI_API.txt`はバックアップ対象から除外することを推奨
-   - 共有環境で使用する場合は、各ユーザーが独自のAPIキーを設定してください
-   - APIキーは定期的にローテーションすることを推奨
-   - 不要になったAPIキーは必ず無効化してください
+5. セキュリティ運用:
+   - APIキー/トークンはバックアップ対象から除外することを推奨
+   - 共有環境ではユーザーごとに個別発行する
+   - 定期ローテーションし、不要キーは無効化する
 
 #### ログファイルとバックアップの取り扱い
 1. ログファイル（`receipt_processing.log`）:

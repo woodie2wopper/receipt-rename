@@ -4,6 +4,14 @@
 
 指定したディレクトリ内のレシート画像ファイルから、支払い情報を抽出してCSVファイルに出力するスクリプトです。
 
+## LLMバックエンドとの関係
+
+- `listup_receipts.py` 自体は LLM API を呼びません。
+- ただし入力となるファイル名は `receipt_rename.py` の抽出結果に依存します。
+- `receipt_rename.py` では `LLM_PROVIDER=gemini`（既定）または `LLM_PROVIDER=openwebui`（local-llm）を使用できます。
+- local-llm は環境依存のため、本ドキュメントでは「利用例」として扱います。
+- APIキー/トークンは公開リポジトリに置かず、`~/.SecretVault` などリポジトリ外で管理してください。
+
 ## 機能
 
 - 指定したディレクトリ内の画像ファイルを直接検索

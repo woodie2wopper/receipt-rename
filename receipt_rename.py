@@ -22,9 +22,9 @@ import glob
 import csv
 from datetime import datetime
 import base64
+import json
 import pandas as pd
 from pdf2image import convert_from_path
-import google.generativeai as genai
 import tempfile
 import logging
 import argparse
@@ -34,6 +34,20 @@ import time
 import re
 import multiprocessing
 import concurrent.futures
+from urllib import request, error
+
+try:
+    import google.generativeai as genai
+except Exception:
+    genai = None
+
+LLM_PROVIDER = None
+LLM_BASE_URL = None
+LLM_MODEL = None
+OPENWEBUI_TOKEN = None
+LLM_TEMPERATURE = 0.0
+LLM_MAX_TOKENS = 200
+LLM_TIMEOUT_SECONDS = 60
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -79,7 +93,7 @@ def setup_logging(debug=False, verbose=False):
     return logging.getLogger(__name__)
 
 def load_api_key():
-    api_key_file = os.path.expanduser("~/.SecretVault/google_AI_API.txt")
+    api_key_file = os.path.expanduser("~/.SecretVault/GEMINI_API.txt")
     try:
         with open(api_key_file, 'r') as f:
             for line in f:
@@ -87,10 +101,149 @@ def load_api_key():
                     return line.split('=')[1].strip()
     except Exception as e:
         print(f"エラー: APIキーの読み込みに失敗しました: {e}")
-        print(f"~/.SecretVault/google_AI_API.txtファイルを確認してください。")
+        print(f"~/.SecretVault/GEMINI_API.txtファイルを確認してください。")
         print("フォーマット: GOOGLE_API_KEY=あなたのAPIキー")
         sys.exit(1)
     return None
+
+def load_secret_from_file(secret_path, key_name):
+    """KEY=VALUE または export KEY=VALUE 形式の秘密情報を読む"""
+    try:
+        with open(os.path.expanduser(secret_path), 'r', encoding='utf-8') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('export '):
+                    line = line[len('export '):]
+                if line.startswith(f'{key_name}='):
+                    return line.split('=', 1)[1].strip().strip('"').strip("'")
+    except FileNotFoundError:
+        return None
+    except Exception:
+        return None
+    return None
+
+def initialize_llm(logger):
+    global LLM_PROVIDER, LLM_BASE_URL, LLM_MODEL, OPENWEBUI_TOKEN
+    global LLM_TEMPERATURE, LLM_MAX_TOKENS, LLM_TIMEOUT_SECONDS
+
+    LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "gemini").strip().lower()
+    LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0"))
+    LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "200"))
+    LLM_TIMEOUT_SECONDS = int(os.environ.get("LLM_TIMEOUT_SECONDS", "60"))
+
+    if LLM_PROVIDER in ("openwebui", "local-llm", "local_llm"):
+        LLM_BASE_URL = (
+            os.environ.get("LLM_BASE_URL")
+            or load_secret_from_file("~/.SecretVault/GX10_OLLAMA_API.txt", "LLM_BASE_URL")
+        )
+        LLM_MODEL = (
+            os.environ.get("LLM_MODEL")
+            or load_secret_from_file("~/.SecretVault/GX10_OLLAMA_API.txt", "LLM_MODEL")
+            or "qwen2.5:7b"
+        )
+        OPENWEBUI_TOKEN = (
+            os.environ.get("OPENWEBUI_TOKEN")
+            or load_secret_from_file("~/.SecretVault/GX10_OLLAMA_API.txt", "OPENWEBUI_TOKEN")
+        )
+
+        if not LLM_BASE_URL:
+            logger.error("LLM_BASE_URL が未設定です（openwebui/local-llm）")
+            sys.exit(1)
+        if not OPENWEBUI_TOKEN:
+            logger.error("OPENWEBUI_TOKEN が未設定です（openwebui/local-llm）")
+            sys.exit(1)
+
+        LLM_BASE_URL = LLM_BASE_URL.rstrip('/')
+        logger.info(f"LLM設定: provider={LLM_PROVIDER}, model={LLM_MODEL}")
+        return
+
+    if LLM_PROVIDER == "gemini":
+        if genai is None:
+            logger.error("google-generativeai が見つかりません。pip install -r requirements.txt を実行してください。")
+            sys.exit(1)
+        google_api_key = load_api_key()
+        if not google_api_key:
+            logger.error("Google APIキーが設定されていません")
+            sys.exit(1)
+        genai.configure(api_key=google_api_key)
+        logger.info("LLM設定: provider=gemini")
+        return
+
+    logger.error(f"未対応の LLM_PROVIDER です: {LLM_PROVIDER}")
+    sys.exit(1)
+
+def call_openwebui_chat(messages, logger):
+    payload = {
+        "model": LLM_MODEL,
+        "temperature": LLM_TEMPERATURE,
+        "max_tokens": LLM_MAX_TOKENS,
+        "messages": messages
+    }
+    data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+    req = request.Request(
+        url=f"{LLM_BASE_URL}/api/chat/completions",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {OPENWEBUI_TOKEN}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with request.urlopen(req, timeout=LLM_TIMEOUT_SECONDS) as resp:
+            body = resp.read().decode('utf-8')
+    except error.HTTPError as e:
+        error_body = e.read().decode('utf-8', errors='replace')
+        logger.error(f"Open WebUI APIエラー: status={e.code}, body={error_body}")
+        raise RuntimeError(f"Open WebUI APIエラー: status={e.code}")
+    except Exception as e:
+        logger.error(f"Open WebUI API呼び出しに失敗しました: {e}")
+        raise RuntimeError("Open WebUI API呼び出しに失敗しました")
+
+    try:
+        parsed = json.loads(body)
+        content = parsed["choices"][0]["message"]["content"]
+        if isinstance(content, list):
+            joined = []
+            for part in content:
+                if isinstance(part, dict) and "text" in part:
+                    joined.append(part["text"])
+            return "\n".join(joined).strip()
+        return str(content).strip()
+    except Exception as e:
+        logger.error(f"Open WebUI レスポンス解析に失敗しました: {e}, body={body}")
+        raise RuntimeError("Open WebUI レスポンス解析に失敗しました")
+
+def llm_extract_text_from_image(base64_image, prompt, logger):
+    if LLM_PROVIDER == "gemini":
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content([
+            {"mime_type": "image/jpeg", "data": base64_image},
+            prompt
+        ])
+        return response.text
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+            ]
+        }
+    ]
+    return call_openwebui_chat(messages, logger)
+
+def llm_extract_structured_text(prompt, logger):
+    if LLM_PROVIDER == "gemini":
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+        return response.text
+
+    messages = [{"role": "user", "content": prompt}]
+    return call_openwebui_chat(messages, logger)
 
 def generate_question(text, years=None):
     year_instruction = f"""
@@ -239,9 +392,6 @@ def process_file(file_path, args, logger, backup_dir):
             # 全ページのテキストを結合
             all_text = []
             
-            # Gemini APIで画像解析
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            
             for i, image_path in enumerate(temp_files, 1):
                 # 画像をBase64エンコード
                 base64_image = encode_image(image_path, logger)
@@ -249,11 +399,8 @@ def process_file(file_path, args, logger, backup_dir):
                     continue
 
                 # テキスト抽出
-                response = model.generate_content([
-                    {
-                        "mime_type": "image/jpeg",
-                        "data": base64_image
-                    },
+                response_text = llm_extract_text_from_image(
+                    base64_image,
                     """この領収書の内容を読み取ってください。
                     以下の形式で回答してください：
 
@@ -286,26 +433,24 @@ def process_file(file_path, args, logger, backup_dir):
                     ---その他の情報---
                     [その他の重要な情報を箇条書きで記述]
                     """
-                ])
-                all_text.append(response.text)
+                , logger)
+                all_text.append(response_text)
 
             # 全ページのテキストを結合
             extracted_text = "\n\n=== ページの区切り ===\n\n".join(all_text)
 
-            # Geminiの回答を一時的に保存
+            # LLMの回答を一時的に保存
             if not args.no_text and extracted_text:
                 with open(text_file, 'w', encoding='utf-8') as f:
                     f.write(extracted_text)
-                logger.info(f"Geminiの回答を保存しました: {text_file}")
+                logger.info(f"LLMの回答を保存しました: {text_file}")
 
         if args.verbose:
             logger.info("抽出されたテキスト:")
             logger.info(extracted_text)
 
         # 情報抽出
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(generate_question(extracted_text, args.year))
-        result = response.text
+        result = llm_extract_structured_text(generate_question(extracted_text, args.year), logger)
 
         if args.debug:
             logger.debug("解析結果:")
@@ -492,13 +637,8 @@ def main():
     args = parse_arguments()
     logger = setup_logging(args.debug, args.verbose)
 
-    # APIキーの設定
-    GOOGLE_API_KEY = load_api_key()
-    if not GOOGLE_API_KEY:
-        logger.error("APIキーが設定されていません")
-        sys.exit(1)
-
-    genai.configure(api_key=GOOGLE_API_KEY)
+    # LLM設定（gemini / openwebui）
+    initialize_llm(logger)
     
     # 処理対象ファイルのリストを作成
     target_files = []
